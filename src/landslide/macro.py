@@ -200,7 +200,7 @@ class IncludeMacro(Macro):
 
     # Macro pattern.
     include_re   = re.compile(
-        r'(?P<leading><p>)(?P<macro>\.(code|coden|include):\s?)(?P<argline>.*?)(?P<trailing></p>\n?)',
+        r'(?P<leading><p>)(?P<macro>\.(code|coden|include)(?P<expandtabs>\d*):\s?)(?P<argline>.*?)(?P<trailing></p>\n?)',
         re.DOTALL | re.UNICODE)
 
     # Custom exception for proper error handling.
@@ -218,6 +218,9 @@ class IncludeMacro(Macro):
                 argline = match.group('argline')
                 context = macro + ' ' + argline
 
+                expandtabs = match.group('expandtabs')
+                if expandtabs != '': expandtabs = int(expandtabs)
+
                 try:
                     include_file, start, stop = self.parse_argline(argline)
                     found = self.locate_file(include_file, source)
@@ -226,7 +229,8 @@ class IncludeMacro(Macro):
                                                  % (include_file, self.options['includepath']))
                     include_file = found
 
-                    include_content = self.get_lines(include_file, start, stop)
+                    include_content = self.get_lines(include_file, start, stop,
+                                                     expandtabs)
 
                     if '.code' in macro:
                         if '.coden' in macro:
@@ -399,10 +403,11 @@ class IncludeMacro(Macro):
         # note the semantics for negative line numbers
         return num - 1 if num > 0 else num
 
-    def get_lines(self, path, start=None, stop=None):
+    def get_lines(self, path, start=None, stop=None, expandtabs=None):
         """Gets the lines of the file as a multiline string between the patterns
            start and stop.  Returns the whole file if no pattern given, one line
            if one argument given, and multiple lines if two patterns given.
+           Converts tabs to spaces with expandtabs.
         """
         f = open(path)
         lines = f.readlines()
@@ -442,8 +447,8 @@ class IncludeMacro(Macro):
                 elif start_index >= stop_index:
                     raise IncludeMacro.Error("lines out of order in [%s, %s]" % (start, stop))
 
-        tabsize = self.options['expandtabs']
-        if tabsize > 0:
-            result = result.expandtabs(tabsize)
+        expandtabs = expandtabs if expandtabs else self.options['expandtabs']
+        if expandtabs > 0:
+            result = result.expandtabs(expandtabs)
 
         return result
