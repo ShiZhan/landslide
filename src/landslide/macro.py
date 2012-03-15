@@ -50,7 +50,7 @@ class CodeHighlightingMacro(Macro):
        Pygments.
     """
     code_blocks_re = re.compile(
-        r'(<pre.+?>(<code>)?\s?!(\w+?)\n(.*?)(</code>)?</pre>)',
+        r'(<pre.+?>(<code>)?\s?(!+)(\w+?)\n(.*?)(</code>)?</pre>)',
         re.UNICODE | re.MULTILINE | re.DOTALL)
 
     html_entity_re = re.compile('&(\w+?);')
@@ -67,8 +67,11 @@ class CodeHighlightingMacro(Macro):
         if not code_blocks:
             return content, []
 
+        if 'linenos' not in self.options or self.options['linenos'] =='no':
+            self.options['linenos'] = False
+
         classes = []
-        for block, void1, lang, code, void2 in code_blocks:
+        for block, void1, bangs, lang, code, void2 in code_blocks:
             try:
                 lexer = get_lexer_by_name(lang)
             except Exception:
@@ -76,10 +79,9 @@ class CodeHighlightingMacro(Macro):
                             % lang, 'warning')
                 return content, classes
 
-            if 'linenos' not in self.options or self.options['linenos'] =='no':
-                self.options['linenos'] = False
+            has_linenos = self.options['linenos'] if bangs == '!' else True
 
-            formatter = HtmlFormatter(linenos=self.options['linenos'],
+            formatter = HtmlFormatter(linenos=has_linenos,
                                       nobackground=True)
             pretty_code = pygments.highlight(self.descape(code), lexer,
                                              formatter)
