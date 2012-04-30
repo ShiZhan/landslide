@@ -110,11 +110,8 @@ class CodeHighlightingMacro(Macro):
             self.options['linenos'] = False
         classes = []
         for block_re in (self.banged_blocks_re, self.fenced_blocks_re):
-            blocks = block_re.finditer(content)
-            if not blocks:
-                continue
-            classes = [u'has_code']
-            for match in blocks:
+            for match in block_re.finditer(content):
+                classes = [u'has_code']
                 content = self.pygmentize(content, match)
 
         return content, classes
