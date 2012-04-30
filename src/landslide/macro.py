@@ -191,7 +191,7 @@ class GistMacro(Macro):
     """This Macro includes a Gist in whole or with specified files."""
 
     # Format strings for Gist embed scripts.
-    GIST_EMBED_FMT = '<script src="https://gist.github.com/%s.js%s"></script>'
+    GIST_EMBED_FMT = '<script src="https://gist.github.com/%s.js?%s"></script>'
     GIST_ARG_FMT   = 'file=%s'
 
     # Macro pattern.
