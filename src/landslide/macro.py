@@ -200,23 +200,21 @@ class GistMacro(Macro):
         re.DOTALL | re.UNICODE)
 
     def process(self, content, source=None):
-        gist_matches = self.gist_re.finditer(content)
-        if gist_matches:
-            for match in gist_matches:
-                args  = match.group('argline').split()
-                if not args:
-                    self.logger(u"Missing gist argument", 'warning')
-                    break
-                gist_content = GistMacro.GIST_EMBED_FMT % (
-                    # gist no
-                    args[0],
-                    # files in the gist (optional)
-                    '&'.join(
-                            map((lambda f: GistMacro.GIST_ARG_FMT % f), args[1:])
-                    )
+        for match in self.gist_re.finditer(content):
+            args  = match.group('argline').split()
+            if not args:
+                self.logger(u"Missing gist argument", 'warning')
+                break
+            gist_content = GistMacro.GIST_EMBED_FMT % (
+                # gist no
+                args[0],
+                # files in the gist (optional)
+                '&'.join(
+                        map((lambda f: GistMacro.GIST_ARG_FMT % f), args[1:])
                 )
-                content = content.replace(match.group(0),
-                                          match.group('leading') +
-                                          gist_content +
-                                          match.group('trailing'), 1)
+            )
+            content = content.replace(match.group(0),
+                                      match.group('leading') +
+                                      gist_content +
+                                      match.group('trailing'), 1)
         return content, []
