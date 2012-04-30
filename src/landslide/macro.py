@@ -216,6 +216,9 @@ class IncludeMacro(Macro):
             argline = match.group('argline')
             context = macro + ' ' + argline
 
+            expandtabs = match.group('expandtabs')
+            if expandtabs != '': expandtabs = int(expandtabs)
+
             try:
                 include_file, start, stop = self.parse_argline(argline)
                 found = self.locate_file(include_file, source)
@@ -224,7 +227,8 @@ class IncludeMacro(Macro):
                                                 % (include_file, self.options['includepath']))
                 include_file = found
 
-                include_content = self.get_lines(include_file, start, stop)
+                include_content = self.get_lines(include_file, start, stop,
+                                                 expandtabs)
 
                 if '.code' in macro:
                     if '.coden' in macro:
