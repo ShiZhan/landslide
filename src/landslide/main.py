@@ -59,6 +59,12 @@ def _parse_options():
         default="presentation.html")
 
     parser.add_option(
+        "-D", "--driver",
+        dest="driver",
+        help="The preferred driver for the computed format",
+        default=None)
+
+    parser.add_option(
         "-e", "--encoding",
         dest="encoding",
         help="The encoding of your files (defaults to utf8)",
