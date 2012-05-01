@@ -69,8 +69,6 @@ class Parser(object):
             if driver not in SUPPORTED_DRIVERS[self.format]:
                 raise RuntimeError(u"Unsupported driver %s for format %s"
                                    % (driver, self.format))
-            self.logger(u"Using driver %s for %s format" %
-                        (driver, self.format), 'debug')
             alternatives = [driver]
         for alternative in alternatives:
             try:
