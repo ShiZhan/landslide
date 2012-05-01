@@ -101,7 +101,6 @@ class Parser(object):
             m = self.module
             return m.html(text,
                 render_flags=
-                    m.HTML_ESCAPE |
                     m.HTML_USE_XHTML |
                     m.HTML_SMARTYPANTS,
                 extensions=
