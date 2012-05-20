@@ -80,13 +80,19 @@ class CodeHighlightingMacro(Macro):
         """, re.VERBOSE | re.UNICODE | re.MULTILINE | re.DOTALL)
 
     html_entity_re = re.compile('&(\w+?);')
+    char_entity_re = re.compile('&#(\d+?);')
 
     def descape(self, string, defs=None):
         """Decodes html entities from a given string"""
         if defs is None:
             defs = htmlentitydefs.entitydefs
-        f = lambda m: defs[m.group(1)] if len(m.groups()) > 0 else m.group(0)
-        return self.html_entity_re.sub(f, string)
+        return self.char_entity_re.sub(
+            lambda m: chr(int(m.group(1))) if len(m.groups()) > 0 else m.group(0),
+            self.html_entity_re.sub(
+                lambda m: defs[m.group(1)] if len(m.groups()) > 0 else m.group(0),
+                string
+            )
+        )
 
     def pygmentize(self, content, match, has_linenos=False):
         block, lang, code = match.group('block'), match.group('lang'), match.group('code')
