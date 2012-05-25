@@ -66,6 +66,8 @@ class Generator(object):
             - ``debug``: enables debug mode
             - ``driver``: preferred driver for the computed format
             - ``embed``: generates a standalone document, with embedded assets
+            - ``css``: user css files
+            - ``js``: user js files
             - ``encoding``: the encoding to use for this presentation
             - ``expandtabs``: number of spaces to expand tabs
             - ``extensions``: Comma separated list of markdown extensions
@@ -93,6 +95,8 @@ class Generator(object):
         self.theme = kwargs.get('theme', 'default')
         self.verbose = kwargs.get('verbose', False)
         self.linenos = self.linenos_check(kwargs.get('linenos'))
+        self.add_user_css(kwargs.get('css', []))
+        self.add_user_js(kwargs.get('js', []))
         self.num_slides = 0
         self.__toc = []
 

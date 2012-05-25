@@ -49,6 +49,22 @@ def _parse_options():
         default=False)
 
     parser.add_option(
+        "-C", "--css",
+        dest="css",
+        help="Add user css file",
+        metavar="FILE",
+        action="append",
+        default=[])
+
+    parser.add_option(
+        "-J", "--js",
+        dest="js",
+        help="Add user js file",
+        metavar="FILE",
+        action="append",
+        default=[])
+
+    parser.add_option(
         "-b", "--debug",
         action="store_true",
         dest="debug",
