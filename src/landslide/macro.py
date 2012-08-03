@@ -552,6 +552,6 @@ class ShelrMacro(Macro):
             )
             content = content.replace(match.group(0),
                                       match.group('leading') +
-                                      gist_content +
+                                      shelr_content +
                                       match.group('trailing'), 1)
         return content, []
