@@ -51,6 +51,7 @@ class Generator(object):
         macro_module.QRMacro,
         macro_module.IncludeMacro,
         macro_module.GistMacro,
+        macro_module.ShelrMacro,
     ]
     user_css = []
     user_js = []
