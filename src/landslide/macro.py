@@ -520,16 +520,16 @@ class GistMacro(Macro):
 
 
 class ShelrMacro(Macro):
-    """This Macro includes a Shelr.tv record."""
+    """This Macro embeds a Shelr.tv record."""
 
-    # Format strings for Gist embed scripts.
+    # Format strings for Shelr embed scripts.
     SHELR_EMBED_FMT = """
     <iframe
         border='0'
         height='80%'
-        id='shelr_record_%s'
+        id='shelr_record_{0}'
         scrolling='no'
-        src='http://shelr.tv/records/%s/embed'
+        src='http://shelr.tv/records/{0}/embed'
         style='border: 0'
         width='100%'>
     </iframe>
@@ -537,21 +537,17 @@ class ShelrMacro(Macro):
 
     # Macro pattern.
     shelr_re   = re.compile(
-        r'(?P<leading><p>)(?P<macro>\.(shelr):\s?)(?P<argline>.*?)(?P<trailing></p>\n?)',
+        r'(?P<leading><p>)(?P<macro>\.(shelr):\s?)(?P<id>.*?)(?P<trailing></p>\n?)',
         re.DOTALL | re.UNICODE)
 
     def process(self, content, source=None):
-        for match in self.gist_re.finditer(content):
-            args  = match.group('argline').split()
-            if not args:
-                self.logger(u"Missing shelr argument", 'warning')
+        for match in self.shelr_re.finditer(content):
+            id  = match.group('id')
+            if not id:
+                self.logger(u"Missing shelr record id", 'warning')
                 break
-            shelr_content = ShelrMacro.SHELR_EMBED_FMT % (
-                # shelr id
-                args[0], args[0]
-            )
             content = content.replace(match.group(0),
                                       match.group('leading') +
-                                      shelr_content +
+                                      ShelrMacro.SHELR_EMBED_FMT.format(id) +
                                       match.group('trailing'), 1)
         return content, []
