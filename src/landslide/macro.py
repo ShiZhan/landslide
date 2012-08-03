@@ -517,3 +517,41 @@ class GistMacro(Macro):
                                       gist_content +
                                       match.group('trailing'), 1)
         return content, []
+
+
+class ShelrMacro(Macro):
+    """This Macro includes a Shelr.tv record."""
+
+    # Format strings for Gist embed scripts.
+    SHELR_EMBED_FMT = """
+    <iframe
+        border='0'
+        height='80%'
+        id='shelr_record_%s'
+        scrolling='no'
+        src='http://shelr.tv/records/%s/embed'
+        style='border: 0'
+        width='100%'>
+    </iframe>
+    """
+
+    # Macro pattern.
+    shelr_re   = re.compile(
+        r'(?P<leading><p>)(?P<macro>\.(shelr):\s?)(?P<argline>.*?)(?P<trailing></p>\n?)',
+        re.DOTALL | re.UNICODE)
+
+    def process(self, content, source=None):
+        for match in self.gist_re.finditer(content):
+            args  = match.group('argline').split()
+            if not args:
+                self.logger(u"Missing shelr argument", 'warning')
+                break
+            shelr_content = ShelrMacro.SHELR_EMBED_FMT % (
+                # shelr id
+                args[0], args[0]
+            )
+            content = content.replace(match.group(0),
+                                      match.group('leading') +
+                                      gist_content +
+                                      match.group('trailing'), 1)
+        return content, []
