@@ -16,6 +16,7 @@
 #  limitations under the License.
 
 import sys
+import pkg_resources
 
 try:
     from landslide import generator
@@ -180,7 +181,20 @@ def _parse_options():
         default='',
     )
 
+    parser.add_option(
+        "-V", "--version",
+        action="store_true",
+        dest="version",
+        help="Display program name and version",
+        default=False,
+    )
+
     (options, args) = parser.parse_args()
+
+    if options.version:
+        version = pkg_resources.require("landslide")[0].version
+        sys.stdout.write("landslide patched " + version + "\n")
+        sys.exit(0)
 
     if not args:
         parser.print_help()
