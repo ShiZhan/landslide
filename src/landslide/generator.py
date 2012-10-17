@@ -522,45 +522,7 @@ class Generator(object):
         slides = self.fetch_contents(self.source)
         context = self.get_template_vars(slides)
 
-        html = template.render(context)
-
-        if self.embed:
-            images = re.findall(r'\s+background(?:-image)?:\surl\((.+?)\).+;',
-                            html, re.DOTALL | re.UNICODE)
-
-            for img_url in images:
-                img_url = img_url.replace('"', '').replace("'", '')
-                if self.theme_dir:
-                    source = os.path.join(self.theme_dir, 'css')
-                else:
-                    source = os.path.join(THEMES_DIR, self.theme, 'css')
-
-                encoded_url = utils.encode_image_from_url(img_url, source)
-                if encoded_url:
-                    html = html.replace(img_url, encoded_url, 1)
-                    self.log("Embedded theme image %s from theme directory %s" % (img_url, source))
-                else:
-                    # Missing file in theme directory. Try user_css folders
-                    found = False
-                    for css_entry in context['user_css']:
-                        directory = os.path.dirname(css_entry['path_url'])
-                        if not directory:
-                            directory = "."
-
-                        encoded_url = utils.encode_image_from_url(img_url, directory)
-
-                        if encoded_url:
-                            found = True
-                            html = html.replace(img_url, encoded_url, 1)
-                            self.log("Embedded theme image %s from directory %s" % (img_url, directory))
-
-                    if not found:
-                        #Missing image file, etc...
-                        self.log(u"Failed to embed theme image %s" % img_url)
-
-
-
-        return html
+        return template.render(context)
 
     def write(self):
         """ Writes generated presentation code into the destination file.
