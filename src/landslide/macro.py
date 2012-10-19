@@ -53,13 +53,13 @@ class CodeHighlightingMacro(Macro):
     """
     banged_blocks_re = re.compile(r"""
         (?P<block>
-            <pre.+?>
+            <pre>
             (<code>)?
-            \s?
-            (?P<pound> [#]? )
+            \s*?
+            (?P<pound>[#]?)
             [!]+
-            (?P<lang> \w+? )\n
-            (?P<code> .*? )
+            (?P<lang>\w+?)\n
+            (?P<code>.*?)
             (</code>)?
             </pre>
         )
@@ -69,12 +69,12 @@ class CodeHighlightingMacro(Macro):
             <pre>
             <code
                 \s+class=
-                (?P<q> ["'] )
-                (?P<pound> [#]? )
-                (?P<lang> \w+? )
+                (?P<q>["'])
+                (?P<pound>[#]?)
+                (?P<lang>\w+?)
                 (?P=q)
             >
-            (?P<code> .*? )
+            (?P<code>.*? )
             (</code>)?</pre>
         )
         """, re.VERBOSE | re.UNICODE | re.MULTILINE | re.DOTALL)
