@@ -53,7 +53,7 @@ class CodeHighlightingMacro(Macro):
     """
     banged_blocks_re = re.compile(r"""
         (?P<block>
-            <pre>
+            <pre[^>]*?>
             (<code>)?
             \s*?
             (?P<pound>[#]?)
