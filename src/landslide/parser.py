@@ -93,24 +93,25 @@ class Parser(object):
         if self.driver == 'markdown':
             if text.startswith(u'\ufeff'):  # check for unicode BOM
               text = text[1:]
-
             return self.module.markdown(text, self.md_extensions)
         elif self.driver == 'misaka':
             if text.startswith(u'\ufeff'):  # check for unicode BOM
               text = text[1:]
             m = self.module
-            return m.html(text,
-                render_flags=
-                    m.HTML_USE_XHTML |
-                    m.HTML_SMARTYPANTS,
-                extensions=
+            class HtmlRenderer(m.HtmlRenderer, m.SmartyPants):
+                pass
+            return m.Markdown(
+                HtmlRenderer(
+                    m.HTML_USE_XHTML
+                ),
                     m.EXT_NO_INTRA_EMPHASIS |
                     m.EXT_FENCED_CODE |
+                    m.EXT_LAX_SPACING |
                     m.EXT_SUPERSCRIPT |
                     m.EXT_AUTOLINK |
                     m.EXT_STRIKETHROUGH |
                     m.EXT_TABLES
-            )
+                ).render(text)
         elif self.driver == 'rst':
             html = self.module.html_body(text, input_encoding=self.encoding)
             # RST generates pretty much markup to be removed in our case
