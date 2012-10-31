@@ -128,6 +128,7 @@ class Generator(object):
             self.includepath = config.get('includepath',
                                           macro_module.IncludeMacro.INCLUDEPATH)
             self.relative = config.get('relative', False)
+            self.extensions = config.get('extensions', '')
             self.theme = config.get('theme', 'default')
             self.add_user_css(config.get('css', []))
             self.add_user_js(config.get('js', []))
@@ -180,13 +181,19 @@ class Generator(object):
             js_list = [js_list]
         for js_path in js_list:
             if js_path and not js_path in self.user_js:
-                if not os.path.exists(js_path):
+                if js_path.startswith("http:"):
+                    self.user_js.append({
+                        'path_url': js_path,
+                        'contents': '',
+                    })
+                elif not os.path.exists(js_path):
                     raise IOError('%s user js file not found' % (js_path,))
-                self.user_js.append({
-                    'path_url': utils.get_path_url(js_path, self.relative),
-                    'contents': codecs.open(js_path,
-                                            encoding=self.encoding).read(),
-                })
+                else:
+                    self.user_js.append({
+                        'path_url': utils.get_path_url(js_path, self.relative),
+                        'contents': codecs.open(js_path,
+                            encoding=self.encoding).read(),
+                    })
 
     def add_toc_entry(self, title, level, slide_number):
         """ Adds a new entry to current presentation Table of Contents.
@@ -459,6 +466,9 @@ class Generator(object):
             config['includepath'] = raw_config.get('landslide', 'includepath')
         if raw_config.has_option('landslide', 'relative'):
             config['relative'] = raw_config.getboolean('landslide', 'relative')
+        if raw_config.has_option('landslide', 'extensions'):
+            config['extensions'] = ",".join(raw_config.get('landslide', 'extensions')\
+                .replace('\r', '').split('\n'))
         if raw_config.has_option('landslide', 'css'):
             config['css'] = raw_config.get('landslide', 'css')\
                 .replace('\r', '').split('\n')

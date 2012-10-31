@@ -97,7 +97,7 @@ class CodeHighlightingMacro(Macro):
     def pygmentize(self, content, match, has_linenos=False):
         block, lang, code = match.group('block'), match.group('lang'), match.group('code')
         try:
-            lexer = get_lexer_by_name(lang)
+            lexer = get_lexer_by_name(lang, startinline=True)
         except Exception:
             self.logger(u"Unknown pygment lexer \"%s\", skipping"
                         % lang, 'warning')
