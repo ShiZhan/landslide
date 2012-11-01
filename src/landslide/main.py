@@ -75,6 +75,14 @@ def _parse_options():
         default=False)
 
     parser.add_option(
+        "-n", "--embed-nopic",
+        action="store_true",
+        dest="no_pic_embed",
+        help="Embed stylesheet and javascript contents, "
+             "w/o images in presentation to make a standalone document",
+        default=False)
+
+    parser.add_option(
         "-l", "--linenos",
         type="choice",
         choices=generator.VALID_LINENOS,

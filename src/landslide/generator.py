@@ -63,6 +63,7 @@ class Generator(object):
             - ``direct``: enables direct rendering presentation to stdout
             - ``debug``: enables debug mode
             - ``embed``: generates a standalone document, with embedded assets
+            - ``no_pic_embed``: generates a standalone document, with embedded assets except images
             - ``encoding``: the encoding to use for this presentation
             - ``extensions``: Comma separated list of markdown extensions
             - ``logger``: a logger lambda to use for logging
@@ -77,6 +78,7 @@ class Generator(object):
                                            'presentation.html')
         self.direct = kwargs.get('direct', False)
         self.embed = kwargs.get('embed', False)
+        self.no_pic_embed = kwargs.get('no_pic_embed', False)
         self.encoding = kwargs.get('encoding', 'utf8')
         self.extensions = kwargs.get('extensions', None)
         self.logger = kwargs.get('logger', None)
@@ -390,7 +392,7 @@ class Generator(object):
                 self.add_toc_entry(u"-", 1, slide_number)
 
         return {'head_title': head_title, 'num_slides': str(self.num_slides),
-                'slides': slides, 'toc': self.toc, 'embed': self.embed,
+                'slides': slides, 'toc': self.toc, 'embed': (self.embed | self.no_pic_embed),
                 'css': self.get_css(), 'js': self.get_js(),
                 'user_css': self.user_css, 'user_js': self.user_js}
 
