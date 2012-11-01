@@ -49,6 +49,9 @@ class Generator(object):
         macro_module.FxMacro,
         macro_module.NotesMacro,
         macro_module.QRMacro,
+        macro_module.IncludeMacro,
+        macro_module.GistMacro,
+        macro_module.ShelrMacro,
     ]
     user_css = []
     user_js = []
@@ -62,10 +65,15 @@ class Generator(object):
             - ``destination_file``: path to html or PDF destination file
             - ``direct``: enables direct rendering presentation to stdout
             - ``debug``: enables debug mode
+            - ``driver``: preferred driver for the computed format
             - ``embed``: generates a standalone document, with embedded assets
             - ``no_pic_embed``: generates a standalone document, with embedded assets except images
+            - ``css``: user css files
+            - ``js``: user js files
             - ``encoding``: the encoding to use for this presentation
+            - ``expandtabs``: number of spaces to expand tabs
             - ``extensions``: Comma separated list of markdown extensions
+            - ``includepath``: Colon separated list of directories to locate included files
             - ``logger``: a logger lambda to use for logging
             - ``presenter_notes``: enable presenter notes
             - ``relative``: enable relative asset urls
@@ -74,12 +82,14 @@ class Generator(object):
         """
         self.copy_theme = kwargs.get('copy_theme', False)
         self.debug = kwargs.get('debug', False)
-        self.destination_file = kwargs.get('destination_file',
-                                           'presentation.html')
+        self.destination_file = kwargs.get('destination_file', None)
         self.direct = kwargs.get('direct', False)
+        self.driver = kwargs.get('driver', None)
         self.embed = kwargs.get('embed', False)
         self.no_pic_embed = kwargs.get('no_pic_embed', False)
+        self.expandtabs = kwargs.get('expandtabs', macro_module.IncludeMacro.EXPANDTABS)
         self.encoding = kwargs.get('encoding', 'utf8')
+        self.includepath = kwargs.get('includepath', macro_module.IncludeMacro.INCLUDEPATH)
         self.extensions = kwargs.get('extensions', None)
         self.logger = kwargs.get('logger', None)
         self.presenter_notes = kwargs.get('presenter_notes', True)
@@ -87,6 +97,8 @@ class Generator(object):
         self.theme = kwargs.get('theme', 'default')
         self.verbose = kwargs.get('verbose', False)
         self.linenos = self.linenos_check(kwargs.get('linenos'))
+        self.add_user_css(kwargs.get('css', []))
+        self.add_user_js(kwargs.get('js', []))
         self.num_slides = 0
         self.__toc = []
 
@@ -108,9 +120,15 @@ class Generator(object):
             self.source = config.get('source')
             if not self.source:
                 raise IOError('unable to fetch a valid source from config')
-            self.destination_file = config.get('destination',
-                self.DEFAULT_DESTINATION)
+            destination_file = config.get('destination', None)
+            if destination_file:
+                self.destination_file = destination_file
+            self.driver = config.get('driver', None)
             self.embed = config.get('embed', False)
+            self.expandtabs = config.get('expandtabs',
+                                         macro_module.IncludeMacro.EXPANDTABS)
+            self.includepath = config.get('includepath',
+                                          macro_module.IncludeMacro.INCLUDEPATH)
             self.relative = config.get('relative', False)
             self.extensions = config.get('extensions', '')
             self.theme = config.get('theme', 'default')
@@ -120,6 +138,8 @@ class Generator(object):
         else:
             self.source = source
 
+        if not self.destination_file:
+            self.destination_file = self.DEFAULT_DESTINATION
         if (os.path.exists(self.destination_file)
             and not os.path.isfile(self.destination_file)):
             raise IOError(u"Destination %s exists and is not a file"
@@ -151,8 +171,7 @@ class Generator(object):
                     raise IOError('%s user css file not found' % (css_path,))
                 self.user_css.append({
                     'path_url': utils.get_path_url(css_path, self.relative),
-                    'contents': codecs.open(css_path,
-                                            encoding=self.encoding).read(),
+                    'contents': self.css_contents(css_path),
                 })
 
     def add_user_js(self, js_list):
@@ -239,8 +258,11 @@ class Generator(object):
                 slides.extend(self.fetch_contents(os.path.join(source, entry)))
         else:
             try:
-                parser = Parser(os.path.splitext(source)[1], self.encoding,
-                    self.extensions)
+                parser = Parser(os.path.splitext(source)[1],
+                                driver=self.driver,
+                                encoding=self.encoding,
+                                md_extensions=self.extensions,
+                                logger=self.logger)
             except NotImplementedError:
                 return slides
 
@@ -253,7 +275,7 @@ class Generator(object):
                 self.log(u"Unable to decode source %s: skipping" % source,
                          'warning')
             else:
-                inner_slides = re.split(r'<hr.+>', parser.parse(file_contents))
+                inner_slides = re.split(r'<hr.*>', parser.parse(file_contents))
                 for inner_slide in inner_slides:
                     slides.append(self.get_slide_vars(inner_slide, source))
 
@@ -301,15 +323,14 @@ class Generator(object):
 
         css['print'] = {
             'path_url': utils.get_path_url(print_css, self.relative),
-            'contents': codecs.open(print_css, encoding=self.encoding).read(),
+            'contents': self.css_contents(print_css),
         }
 
         screen_css = os.path.join(self.theme_dir, 'css', 'screen.css')
         if (os.path.exists(screen_css)):
             css['screen'] = {
                 'path_url': utils.get_path_url(screen_css, self.relative),
-                'contents': codecs.open(screen_css,
-                                        encoding=self.encoding).read(),
+                'contents': self.css_contents(screen_css),
             }
         else:
             self.log(u"No screen stylesheet provided in current theme",
@@ -436,8 +457,15 @@ class Generator(object):
             config['destination'] = raw_config.get('landslide', 'destination')
         if raw_config.has_option('landslide', 'linenos'):
             config['linenos'] = raw_config.get('landslide', 'linenos')
+        if raw_config.has_option('landslide', 'driver'):
+            config['driver'] = raw_config.get('landslide', 'driver')
+            self.log(u"Using    configured driver %s" % config['driver'])
         if raw_config.has_option('landslide', 'embed'):
             config['embed'] = raw_config.getboolean('landslide', 'embed')
+        if raw_config.has_option('landslide', 'expandtabs'):
+            config['expandtabs'] = raw_config.getint('landslide', 'expandtabs')
+        if raw_config.has_option('landslide', 'includepath'):
+            config['includepath'] = raw_config.get('landslide', 'includepath')
         if raw_config.has_option('landslide', 'relative'):
             config['relative'] = raw_config.getboolean('landslide', 'relative')
         if raw_config.has_option('landslide', 'extensions'):
@@ -454,7 +482,10 @@ class Generator(object):
     def process_macros(self, content, source=None):
         """ Processed all macros.
         """
-        macro_options = {'relative': self.relative, 'linenos': self.linenos}
+        macro_options = {
+            'relative': self.relative, 'linenos': self.linenos,
+            'expandtabs': self.expandtabs, 'includepath': self.includepath,
+        }
         classes = []
         for macro_class in self.macros:
             try:
@@ -478,6 +509,23 @@ class Generator(object):
                 raise TypeError("Coundn't register macro; a macro must inherit"
                                 " from macro.Macro")
 
+    def css_contents(self, css_path):
+        """ Returns stylesheet content by optionally embedding images and fonts.
+        """
+        contents = codecs.open(css_path, encoding=self.encoding).read()
+        if self.embed:
+            urls = re.findall(r'\burl\((.+?)\)', contents, re.UNICODE)
+            source_path = os.path.dirname(css_path)
+            for url in urls:
+                url = url.replace('"', '').replace("'", '')
+                encoded_url = utils.encode_image_from_url(url, source_path)
+                if encoded_url is not False:
+                    self.logger(u"Embedded image %s in %s" %
+                                (url, css_path), 'notice')
+                    contents = contents.replace(url, encoded_url, 1)
+
+        return contents
+
     def render(self):
         """ Returns generated html code.
         """
@@ -486,45 +534,7 @@ class Generator(object):
         slides = self.fetch_contents(self.source)
         context = self.get_template_vars(slides)
 
-        html = template.render(context)
-
-        if self.embed:
-            images = re.findall(r'\s+background(?:-image)?:\surl\((.+?)\).+;',
-                            html, re.DOTALL | re.UNICODE)
-
-            for img_url in images:
-                img_url = img_url.replace('"', '').replace("'", '')
-                if self.theme_dir:
-                    source = os.path.join(self.theme_dir, 'css')
-                else:
-                    source = os.path.join(THEMES_DIR, self.theme, 'css')
-
-                encoded_url = utils.encode_image_from_url(img_url, source)
-                if encoded_url:
-                    html = html.replace(img_url, encoded_url, 1)
-                    self.log("Embedded theme image %s from theme directory %s" % (img_url, source))
-                else:
-                    # Missing file in theme directory. Try user_css folders
-                    found = False
-                    for css_entry in context['user_css']:
-                        directory = os.path.dirname(css_entry['path_url'])
-                        if not directory: 
-                            directory = "."
-
-                        encoded_url = utils.encode_image_from_url(img_url, directory)
-                            
-                        if encoded_url:
-                            found = True
-                            html = html.replace(img_url, encoded_url, 1)
-                            self.log("Embedded theme image %s from directory %s" % (img_url, directory))
-                    
-                    if not found:
-                        #Missing image file, etc...
-                        self.log(u"Failed to embed theme image %s" % img_url)
-
-
-
-        return html
+        return template.render(context)
 
     def write(self):
         """ Writes generated presentation code into the destination file.

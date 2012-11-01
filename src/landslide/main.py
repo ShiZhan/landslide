@@ -16,11 +16,17 @@
 #  limitations under the License.
 
 import sys
+import pkg_resources
 
 try:
     from landslide import generator
 except ImportError:
     import generator
+
+try:
+    from landslide import macro
+except ImportError:
+    import macro
 
 from optparse import OptionParser
 
@@ -44,6 +50,22 @@ def _parse_options():
         default=False)
 
     parser.add_option(
+        "-C", "--css",
+        dest="css",
+        help="Add user css file",
+        metavar="FILE",
+        action="append",
+        default=[])
+
+    parser.add_option(
+        "-J", "--js",
+        dest="js",
+        help="Add user js file",
+        metavar="FILE",
+        action="append",
+        default=[])
+
+    parser.add_option(
         "-b", "--debug",
         action="store_true",
         dest="debug",
@@ -56,7 +78,21 @@ def _parse_options():
         help="The path to the to the destination file: .html or "
              ".pdf extensions allowed (default: presentation.html)",
         metavar="FILE",
-        default="presentation.html")
+        default=None)
+
+    parser.add_option(
+        "-E", "--expandtabs",
+        type="int",
+        dest="expandtabs",
+        help="Number of spaces to expand tabs in included files.",
+        metavar="INTEGER",
+        default=macro.IncludeMacro.EXPANDTABS)
+
+    parser.add_option(
+        "-D", "--driver",
+        dest="driver",
+        help="The preferred driver for the computed format",
+        default=None)
 
     parser.add_option(
         "-e", "--encoding",
@@ -64,6 +100,13 @@ def _parse_options():
         help="The encoding of your files (defaults to utf8)",
         metavar="ENCODING",
         default="utf8")
+
+    parser.add_option(
+        "-I", "--includepath",
+        dest="includepath",
+        help="Colon separated list of directories to locate included files.",
+        metavar="PATH",
+        default=macro.IncludeMacro.INCLUDEPATH)
 
     parser.add_option(
         "-i", "--embed",
@@ -146,7 +189,20 @@ def _parse_options():
         default='',
     )
 
+    parser.add_option(
+        "-V", "--version",
+        action="store_true",
+        dest="version",
+        help="Display program name and version",
+        default=False,
+    )
+
     (options, args) = parser.parse_args()
+
+    if options.version:
+        version = pkg_resources.require("landslide")[0].version
+        sys.stdout.write("landslide patched " + version + "\n")
+        sys.exit(0)
 
     if not args:
         parser.print_help()

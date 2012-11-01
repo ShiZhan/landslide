@@ -22,6 +22,8 @@ import sys
 import utils
 
 from pygments.lexers import get_lexer_by_name
+from pygments.lexers import get_lexer_for_filename
+from pygments.lexers import guess_lexer
 from pygments.formatters import HtmlFormatter
 
 
@@ -49,43 +51,76 @@ class CodeHighlightingMacro(Macro):
     """This Macro performs syntax coloration in slide code blocks using
        Pygments.
     """
-    code_blocks_re = re.compile(
-        r'(<pre.+?>(<code>)?\s?!(\S+?)\n(.*?)(</code>)?</pre>)',
-        re.UNICODE | re.MULTILINE | re.DOTALL)
+    banged_blocks_re = re.compile(r"""
+        (?P<block>
+            <pre[^>]*?>
+            (<code>)?
+            \s*?
+            (?P<pound>[#]?)
+            [!]+
+            (?P<lang>\w+?)\n
+            (?P<code>.*?)
+            (</code>)?
+            </pre>
+        )
+        """, re.VERBOSE | re.UNICODE | re.MULTILINE | re.DOTALL)
+    fenced_blocks_re = re.compile(r"""
+        (?P<block>
+            <pre>
+            <code
+                \s+class=
+                (?P<q>["'])
+                (?P<pound>[#]?)
+                (?P<lang>\w+?)
+                (?P=q)
+            >
+            (?P<code>.*? )
+            (</code>)?</pre>
+        )
+        """, re.VERBOSE | re.UNICODE | re.MULTILINE | re.DOTALL)
 
     html_entity_re = re.compile('&(\w+?);')
+    char_entity_re = re.compile('&#(\d+?);')
 
     def descape(self, string, defs=None):
         """Decodes html entities from a given string"""
         if defs is None:
             defs = htmlentitydefs.entitydefs
-        f = lambda m: defs[m.group(1)] if len(m.groups()) > 0 else m.group(0)
-        return self.html_entity_re.sub(f, string)
+        return self.char_entity_re.sub(
+            lambda m: chr(int(m.group(1))) if len(m.groups()) > 0 else m.group(0),
+            self.html_entity_re.sub(
+                lambda m: defs[m.group(1)] if len(m.groups()) > 0 else m.group(0),
+                string
+            )
+        )
+
+    def pygmentize(self, content, match, has_linenos=False):
+        block, lang, code = match.group('block'), match.group('lang'), match.group('code')
+        try:
+            lexer = get_lexer_by_name(lang, startinline=True)
+        except Exception:
+            self.logger(u"Unknown pygment lexer \"%s\", skipping"
+                        % lang, 'warning')
+            return content
+
+        has_linenos = self.options['linenos'] if not match.group('pound') else True
+
+        formatter = HtmlFormatter(linenos=has_linenos,
+                                    nobackground=True)
+        pretty_code = pygments.highlight(self.descape(code), lexer,
+                                            formatter)
+        return content.replace(block, pretty_code, 1)
 
     def process(self, content, source=None):
-        code_blocks = self.code_blocks_re.findall(content)
-        if not code_blocks:
-            return content, []
-
+        if 'linenos' not in self.options or self.options['linenos'] == 'no':
+            self.options['linenos'] = False
         classes = []
-        for block, void1, lang, code, void2 in code_blocks:
-            try:
-                lexer = get_lexer_by_name(lang, startinline=True)
-            except Exception:
-                self.logger(u"Unknown pygment lexer \"%s\", skipping"
-                            % lang, 'warning')
-                return content, classes
+        for block_re in (self.banged_blocks_re, self.fenced_blocks_re):
+            for match in block_re.finditer(content):
+                classes = [u'has_code']
+                content = self.pygmentize(content, match)
 
-            if 'linenos' not in self.options or self.options['linenos'] =='no':
-                self.options['linenos'] = False
-
-            formatter = HtmlFormatter(linenos=self.options['linenos'],
-                                      nobackground=True)
-            pretty_code = pygments.highlight(self.descape(code), lexer,
-                                             formatter)
-            content = content.replace(block, pretty_code, 1)
-
-        return content, [u'has_code']
+        return content, classes
 
 
 class EmbedImagesMacro(Macro):
@@ -186,3 +221,333 @@ class QRMacro(Macro):
             classes.append(u'has_qr')
 
         return new_content, classes
+
+
+class IncludeMacro(Macro):
+    """This Macro includes the specified line or, range of lines of the given
+       file as a highlighted code block or as is (raw HTML).
+    """
+
+    # Defaults
+    INCLUDEPATH = '.'
+    EXPANDTABS  = 8
+
+    # Macro pattern.
+    include_re   = re.compile(
+        r'(?P<leading><p>)(?P<macro>\.(code|coden|include)(?P<expandtabs>\d*):\s?)(?P<argline>.*?)(?P<trailing></p>\n?)',
+        re.DOTALL | re.UNICODE)
+
+    # Custom exception for proper error handling.
+    class Error(Exception): pass
+
+    def process(self, content, source=None):
+        self.options['expandtabs']  = self.options.get('expandtabs',
+                                                        IncludeMacro.EXPANDTABS)
+        self.options['includepath'] = self.options.get('includepath',
+                                                        IncludeMacro.INCLUDEPATH)
+        for match in self.include_re.finditer(content):
+            macro   = match.group('macro')
+            argline = match.group('argline')
+            context = macro + ' ' + argline
+
+            expandtabs = match.group('expandtabs')
+            if expandtabs != '': expandtabs = int(expandtabs)
+
+            try:
+                include_file, start, stop = self.parse_argline(argline)
+                found = self.locate_file(include_file, source)
+                if not found:
+                    raise IncludeMacro.Error("couldn't locate file \"%s\" from include path \"%s\""
+                                                % (include_file, self.options['includepath']))
+                include_file = found
+
+                include_content = self.get_lines(include_file, start, stop,
+                                                 expandtabs)
+
+                if '.code' in macro:
+                    if '.coden' in macro:
+                        # .coden
+                        self.options['linenos'] = 'inline'
+                        lineno_status = 'with linenos'
+                    else:
+                        # .code
+                        self.options['linenos'] = False
+                        lineno_status = ''
+                    self.logger(u"Including file \"%s\" as code %s"
+                                % (include_file, lineno_status), 'notice')
+
+                    try:
+                        # Try to guess language from file extension.
+                        lexer = get_lexer_for_filename(include_file)
+                    except Exception:
+                        try:
+                            # Otherwise fallback to examine the file content.
+                            # Note that this may produce wrong guesses for a small file.
+                            lexer = guess_lexer(content)
+                        except Exception:
+                            self.logger(u"No available pygment lexer found; skipping highlighting",
+                                        'warning')
+                            return content
+
+                    formatter = HtmlFormatter(linenos=self.options['linenos'],
+                                            nobackground=True)
+                    include_content = pygments.highlight(include_content, lexer, formatter)
+                else:
+                    # .include
+                    self.logger(u"Including file \"%s\" as is" % include_file, 'notice')
+
+                content = content.replace(match.group(0),
+                                match.group('leading') +
+                                include_content +
+                                match.group('trailing'), 1)
+            except IncludeMacro.Error, e:
+                self.logger(u"Include error at \"%s\": %s" % (context, e), 'warning')
+            except Exception, e:
+                self.logger(u"Unexpected error at \"%s\": %s; please report a bug"
+                            % (context, e), 'warning')
+
+        return content, []
+
+    def parse_pattern(self, string):
+        """Parse a pattern argument"""
+        try:
+            # Simple case: we have a line number.
+            return int(string)
+        except ValueError:
+            pass
+
+        # Otherwise we have a regular expression and (optionally) an offset
+
+        prev = pattern = offset = ''
+        start, stop = 0, len(string)
+        if string[start] in '/':
+            delim = string[start]
+            start += 1
+            for i, c in enumerate(string[start:]):
+                if c == delim and prev != '\\':
+                    stop = i+ start
+                    break
+                prev = c
+            pattern, offset = string[start:stop], string[stop+1:]
+        else:
+            pattern = string
+
+        compiled = None
+        if pattern:
+            try:
+                compiled = re.compile(pattern, re.DOTALL | re.UNICODE)
+            except Exception:
+                raise IncludeMacro.Error("invalid pattern: \"%s\"" % string)
+
+            if offset:
+                m = re.search(r'(?P<sign>[+-]?)(?P<offset>\d*)', offset)
+                if not m:
+                    raise IncludeMacro.Error("invalid offset: \"%s\"" % string)
+                sign, offset = m.group('sign'), m.group('offset')
+                if offset:
+                    try:
+                        offset = int(offset)
+                    except ValueError:
+                        raise IncludeMacro.Error("invalid offset: \"%s\"" % string)
+                else:
+                    offset = 1 if sign else 0
+                if sign == '-':
+                    offset = -offset
+            else:
+                offset = 0
+
+            return {
+                'source': string,
+                    're': compiled,
+                'offset': offset,
+            }
+
+    def parse_argline(self, argline):
+        """Parse macro arguments"""
+        # XXX Ugly hack to restore the special character '*' which rendered
+        # to <em>...</em> when occured in pair.
+        # For example: "/.*foo/ /.*bar/" becomes  "/.<em>foo/ /.</em>bar/
+        if '<em>' in argline and '</em>' in argline:
+            argline_fixed = re.sub(r'</?em>', '*', argline)
+            self.logger(u"Argline \"%s\" was fixed as \"%s\""
+                        % (argline, argline_fixed), 'warning')
+            argline = argline_fixed
+
+        path = start = stop = None
+        args = iter(argline.split())
+        try:
+            path  = args.next()
+            start = self.parse_pattern(args.next())
+            stop  = self.parse_pattern(args.next())
+        except StopIteration:
+            pass
+
+        if not path:
+            raise IncludeMacro.Error("no include file specified")
+
+        return path, start, stop
+
+    def locate_file(self, path, source=None):
+        """Locate the given file in includepath"""
+        paths = [os.path.expanduser(p)
+                 for p in self.options['includepath'].split(':')]
+        if '.' not in paths:  # current directory should always be in path
+            paths.append('.')
+        curdir = os.path.dirname(source)
+        if not curdir:
+            curdir = "."
+        for p in paths:
+            f = os.path.normpath(os.path.join(curdir, p, path))
+            if os.path.exists(f):
+                return f
+
+        return None
+
+    def index_matched(self, lines, start, pattern):
+        """Identifies the line in lines that matches the pattern, starting from
+           start.  Return value is 0-indexed.
+        """
+        max = len(lines)
+        if pattern['source'] == '$':
+            return max - 1
+
+        found = None
+        for i in range(start, max):
+            if pattern['re'].match(lines[i]):
+                found = i
+                break
+        if found is None:
+            raise IncludeMacro.Error("no matched line for pattern \"%s\""
+                                     % pattern['source'])
+
+        found += pattern['offset']
+        if found < 0 or found >= max:
+            raise IncludeMacro.Error("offset matched line is out of range [1-%d]" % max)
+
+        return found
+
+
+    def index_numbered(self, lines, num):
+        """Converts a 1-indexed line number to a 0-indexed value."""
+        max = len(lines)
+        if abs(num) > max:
+            raise IncludeMacro.Error("line %d is out of range [1-%d]" % (num, max))
+        # note the semantics for negative line numbers
+        return num - 1 if num > 0 else num
+
+    def get_lines(self, path, start=None, stop=None, expandtabs=None):
+        """Gets the lines of the file as a multiline string between the patterns
+           start and stop.  Returns the whole file if no pattern given, one line
+           if one argument given, and multiple lines if two patterns given.
+           Converts tabs to spaces with expandtabs.
+        """
+        f = open(path)
+        lines = f.readlines()
+        f.close()
+
+        result = ""
+
+        if start is None:
+            # all lines
+            result = "".join(lines)
+        else:
+            if stop is None:
+                # one line
+                if type(start) is int:
+                    result = lines[self.index_numbered(lines, start)]
+                else:
+                    result = lines[self.index_matched(lines, 0, start)]
+            else:
+                # multi lines
+                if type(start) is int:
+                    start_index = self.index_numbered(lines, start)
+                else:
+                    start_index = self.index_matched(lines, 0, start)
+
+                if type(stop) is int:
+                    stop_index = self.index_numbered(lines, stop)
+                else:
+                    stop_index = self.index_matched(lines, start_index, stop)
+
+                results = lines[
+                    start_index:
+                    # -1, which represents the file end, should not wrap up to 0
+                    len(lines) if stop_index == -1 else stop_index + 1
+                ]
+                if results:
+                    result = "".join(results)
+                elif start_index >= stop_index:
+                    raise IncludeMacro.Error("lines out of order in [%s, %s]" % (start, stop))
+
+        expandtabs = expandtabs if expandtabs else self.options['expandtabs']
+        if expandtabs > 0:
+            result = result.expandtabs(expandtabs)
+
+        return result
+
+
+class GistMacro(Macro):
+    """This Macro includes a Gist in whole or with specified files."""
+
+    # Format strings for Gist embed scripts.
+    GIST_EMBED_FMT = '<script src="https://gist.github.com/%s.js?%s"></script>'
+    GIST_ARG_FMT   = 'file=%s'
+
+    # Macro pattern.
+    gist_re   = re.compile(
+        r'(?P<leading><p>)(?P<macro>\.(gist):\s?)(?P<argline>.*?)(?P<trailing></p>\n?)',
+        re.DOTALL | re.UNICODE)
+
+    def process(self, content, source=None):
+        for match in self.gist_re.finditer(content):
+            args  = match.group('argline').split()
+            if not args:
+                self.logger(u"Missing gist argument", 'warning')
+                break
+            gist_content = GistMacro.GIST_EMBED_FMT % (
+                # gist no
+                args[0],
+                # files in the gist (optional)
+                '&'.join(
+                        map((lambda f: GistMacro.GIST_ARG_FMT % f), args[1:])
+                )
+            )
+            content = content.replace(match.group(0),
+                                      match.group('leading') +
+                                      gist_content +
+                                      match.group('trailing'), 1)
+        return content, []
+
+
+class ShelrMacro(Macro):
+    """This Macro embeds a Shelr.tv record."""
+
+    # Format strings for Shelr embed scripts.
+    SHELR_EMBED_FMT = """
+    <iframe
+        border='0'
+        height='80%'
+        id='shelr_record_{0}'
+        scrolling='no'
+        src='http://shelr.tv/records/{0}/embed'
+        style='border: 0'
+        width='100%'>
+    </iframe>
+    """
+
+    # Macro pattern.
+    shelr_re   = re.compile(
+        r'(?P<leading><p>)(?P<macro>\.(shelr):\s?)(?P<id>.*?)(?P<trailing></p>\n?)',
+        re.DOTALL | re.UNICODE)
+
+    def process(self, content, source=None):
+        for match in self.shelr_re.finditer(content):
+            id  = match.group('id')
+            if not id:
+                self.logger(u"Missing shelr record id", 'warning')
+                break
+            content = content.replace(match.group(0),
+                                      match.group('leading') +
+                                      ShelrMacro.SHELR_EMBED_FMT.format(id) +
+                                      match.group('trailing'), 1)
+        return content, []
