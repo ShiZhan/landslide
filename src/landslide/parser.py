@@ -110,8 +110,7 @@ class Parser(object):
             return m.Markdown(
                 HtmlRenderer(
                     m.HTML_USE_XHTML
-                ),
-                    m.EXT_NO_INTRA_EMPHASIS |
+                ),  m.EXT_NO_INTRA_EMPHASIS |
                     m.EXT_FENCED_CODE |
                     m.EXT_LAX_SPACING |
                     m.EXT_SUPERSCRIPT |
