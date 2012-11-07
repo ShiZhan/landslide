@@ -24,7 +24,7 @@ SUPPORTED_FORMATS = {
 }
 
 SUPPORTED_DRIVERS = {
-    'markdown':         ['misaka', 'markdown'],
+    'markdown':         ['markdown', 'misaka'],
     'restructuredtext': ['rst'],
     'textile':          ['textile'],
 }
@@ -93,7 +93,14 @@ class Parser(object):
         if self.driver == 'markdown':
             if text.startswith(u'\ufeff'):  # check for unicode BOM
               text = text[1:]
-            return self.module.markdown(text, self.md_extensions)
+            if not self.md_extensions:
+                try:
+                    html = self.module.markdown(text, ['extraextra'])
+                except ImportError:
+                    html = self.module.markdown(text, ['extra'])
+            else:
+                html = self.module.markdown(text, self.md_extensions)
+            return html
         elif self.driver == 'misaka':
             if text.startswith(u'\ufeff'):  # check for unicode BOM
               text = text[1:]
