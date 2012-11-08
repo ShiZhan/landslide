@@ -189,15 +189,6 @@ echo $bar;
         with self.assertRaises(StopIteration):
             blocks.next()
 
-    def test_descape(self):
-        m = macro.CodeHighlightingMacro(self.logtest)
-        self.assertEquals(m.descape('foo'), 'foo')
-        self.assertEquals(m.descape('&gt;'), '>')
-        self.assertEquals(m.descape('&lt;'), '<')
-        self.assertEquals(m.descape('&amp;lt;'), '&lt;')
-        self.assertEquals(m.descape('&lt;span&gt;'), '<span>')
-        self.assertEquals(m.descape('&lt;spam&amp;eggs&gt;'), '<spam&eggs>')
-
     def test_process(self):
         m = macro.CodeHighlightingMacro(self.logtest)
         hl = m.process("<pre><code>!php\n$foo;</code></pre>")
