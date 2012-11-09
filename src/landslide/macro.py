@@ -16,7 +16,7 @@
 
 import os
 import re
-import htmlentitydefs
+import HTMLParser
 import pygments
 import sys
 import utils
@@ -48,6 +48,8 @@ class Macro(object):
 
 
 class CodeHighlightingMacro(Macro):
+    htmlparser = HTMLParser.HTMLParser()
+
     """This Macro performs syntax coloration in slide code blocks using
        Pygments.
     """
@@ -79,21 +81,6 @@ class CodeHighlightingMacro(Macro):
         )
         """, re.VERBOSE | re.UNICODE | re.MULTILINE | re.DOTALL)
 
-    html_entity_re = re.compile('&(\w+?);')
-    char_entity_re = re.compile('&#(\d+?);')
-
-    def descape(self, string, defs=None):
-        """Decodes html entities from a given string"""
-        if defs is None:
-            defs = htmlentitydefs.entitydefs
-        return self.char_entity_re.sub(
-            lambda m: chr(int(m.group(1))) if len(m.groups()) > 0 else m.group(0),
-            self.html_entity_re.sub(
-                lambda m: defs[m.group(1)] if len(m.groups()) > 0 else m.group(0),
-                string
-            )
-        )
-
     def pygmentize(self, content, match, has_linenos=False):
         block, lang, code = match.group('block'), match.group('lang'), match.group('code')
         try:
@@ -107,8 +94,8 @@ class CodeHighlightingMacro(Macro):
 
         formatter = HtmlFormatter(linenos=has_linenos,
                                     nobackground=True)
-        pretty_code = pygments.highlight(self.descape(code), lexer,
-                                            formatter)
+        pretty_code = pygments.highlight(self.htmlparser.unescape(code),
+                                         lexer, formatter)
         return content.replace(block, pretty_code, 1)
 
     def process(self, content, source=None):
