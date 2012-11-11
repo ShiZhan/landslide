@@ -114,7 +114,7 @@ class Parser(object):
                     m.EXT_FENCED_CODE |
                     m.EXT_LAX_SPACING |
                     m.EXT_SUPERSCRIPT |
-                    m.EXT_AUTOLINK |
+                    # m.EXT_AUTOLINK |
                     m.EXT_STRIKETHROUGH |
                     m.EXT_TABLES
                 ).render(text)
