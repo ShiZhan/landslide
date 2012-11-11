@@ -114,6 +114,9 @@ Several options are available using the command line:
     -i, --embed           Embed stylesheet and javascript contents,
                           base64-encoded images in presentation to make a
                           standalone document
+    -n, --embed-nopic     Embed stylesheet and javascript contents,
+                          (without images) in presentation to make a
+                          standalone document
     -l LINENOS, --linenos=LINENOS
                           How to output linenos in source code. Three options
                           availables: no (no line numbers); inline (inside <pre>
