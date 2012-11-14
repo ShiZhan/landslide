@@ -145,12 +145,8 @@ class Generator(object):
         if not os.path.isdir(source_abspath):
             source_abspath = os.path.dirname(source_abspath)
 
-        if self.watch:
-            from watcher import watch
-            self.watch_dir = source_abspath
+        self.watch_dir = source_abspath
 
-        if not self.destination_file:
-            self.destination_file = self.DEFAULT_DESTINATION
         if (os.path.exists(self.destination_file)
             and not os.path.isfile(self.destination_file)):
             raise IOError(u"Destination %s exists and is not a file"
@@ -242,6 +238,8 @@ class Generator(object):
             self.write_and_log()
 
             if self.watch:
+                from watcher import watch
+
                 self.log(u"Watching %s\n" % self.watch_dir)
 
                 watch(self.watch_dir, self.write_and_log)
